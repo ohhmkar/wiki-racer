@@ -1,10 +1,15 @@
 #include "wiki/search.hpp"
 
 #include <algorithm>
+#include <atomic>
+#include <exception>
 #include <iostream>
+#include <mutex>
 #include <queue>
+#include <thread>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 namespace wiki
 {
@@ -67,6 +72,60 @@ namespace wiki
 
   namespace
   {
+    std::vector<std::pair<std::string, std::vector<std::string>>> fetchNeighboursConcurrently(
+        const std::vector<std::string> &nodes,
+        const NeighbourProvider &getNeighbours)
+    {
+      std::vector<std::pair<std::string, std::vector<std::string>>> results(nodes.size());
+
+      if (nodes.empty())
+        return results;
+
+      std::size_t numThreads = std::thread::hardware_concurrency();
+      if (numThreads == 0)
+        numThreads = 1;
+      numThreads = std::min(numThreads, nodes.size());
+
+      std::atomic<std::size_t> next{0};
+      std::mutex errorMutex;
+      std::exception_ptr error;
+
+      std::vector<std::thread> workers;
+      workers.reserve(numThreads);
+
+      for (std::size_t i = 0; i < numThreads; ++i)
+      {
+        workers.emplace_back([&] {
+          while (true)
+          {
+            std::size_t idx = next.fetch_add(1);
+            if (idx >= nodes.size())
+              break;
+
+            try
+            {
+              results[idx] = {nodes[idx], getNeighbours(nodes[idx])};
+            }
+            catch (...)
+            {
+              std::lock_guard<std::mutex> lock(errorMutex);
+              if (!error)
+                error = std::current_exception();
+              break;
+            }
+          }
+        });
+      }
+
+      for (auto &worker : workers)
+        worker.join();
+
+      if (error)
+        std::rethrow_exception(error);
+
+      return results;
+    }
+
     std::vector<std::string> reconstructPath(const std::string &meeting, const std::unordered_map<std::string, std::string> &forwardParent, const std::unordered_map<std::string, std::string> &backwardParent)
     {
       std::vector<std::string> path;
@@ -110,48 +169,78 @@ namespace wiki
 
     while (!forwardQueue.empty() && !backwardQueue.empty())
     {
+      constexpr std::size_t batchSize = 4;
+
+      std::vector<std::string> forwardLevel;
       std::size_t forwardSize = forwardQueue.size();
 
       while (forwardSize--)
       {
-        std::string current = forwardQueue.front();
+        forwardLevel.push_back(forwardQueue.front());
         forwardQueue.pop();
+      }
 
-        for (const auto &neighbour : getNeighbours(current))
+      while (!forwardLevel.empty())
+      {
+        std::size_t batch = std::min(batchSize, forwardLevel.size());
+        std::vector<std::string> batchNodes(forwardLevel.begin(), forwardLevel.begin() + batch);
+        forwardLevel.erase(forwardLevel.begin(), forwardLevel.begin() + batch);
+
+        auto results = fetchNeighboursConcurrently(batchNodes, getNeighbours);
+
+        for (const auto &[current, neighbours] : results)
         {
-          if (forwardParent.contains(neighbour))
+          for (const auto &neighbour : neighbours)
           {
-            continue;
-          }
+            if (forwardParent.contains(neighbour))
+            {
+              continue;
+            }
 
-          forwardParent[neighbour] = current;
-          forwardQueue.push(neighbour);
+            forwardParent[neighbour] = current;
+            forwardQueue.push(neighbour);
 
-          if (backwardParent.contains(neighbour))
-          {
-            return reconstructPath(neighbour, forwardParent, backwardParent);
+            if (backwardParent.contains(neighbour))
+            {
+              return reconstructPath(neighbour, forwardParent, backwardParent);
+            }
           }
         }
       }
 
+      std::vector<std::string> backwardLevel;
       std::size_t backwardSize = backwardQueue.size();
 
       while (backwardSize--)
       {
-        std::string current = backwardQueue.front();
+        backwardLevel.push_back(backwardQueue.front());
         backwardQueue.pop();
+      }
 
-        for (const auto &neighbour : getReverseNeighbours(current))
+      while (!backwardLevel.empty())
+      {
+        std::size_t batch = std::min(batchSize, backwardLevel.size());
+        std::vector<std::string> batchNodes(backwardLevel.begin(), backwardLevel.begin() + batch);
+        backwardLevel.erase(backwardLevel.begin(), backwardLevel.begin() + batch);
+
+        auto results = fetchNeighboursConcurrently(batchNodes, getReverseNeighbours);
+
+        for (const auto &[current, neighbours] : results)
         {
-          if (backwardParent.contains(neighbour))
-            continue;
-
-          backwardParent[neighbour] = current;
-          backwardQueue.push(neighbour);
-
-          if (forwardParent.contains(neighbour))
+          for (const auto &neighbour : neighbours)
           {
-            return reconstructPath(neighbour, forwardParent, backwardParent);
+            if (backwardParent.contains(neighbour))
+            {
+              continue;
+            }
+
+            backwardParent[neighbour] = current;
+            backwardQueue.push(neighbour);
+
+            if (forwardParent.contains(neighbour))
+            {
+              return reconstructPath(neighbour, forwardParent, backwardParent);
+            }
           }
         }
       }
