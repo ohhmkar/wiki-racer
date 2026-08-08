@@ -30,7 +30,7 @@ namespace wiki
         auto cached = cache.find(title);
         if (cached != cache.end())
         {
-            reutn cached->second;
+            return cached->second;
         }
         CURL *curl = curl_easy_init();
 

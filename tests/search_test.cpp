@@ -62,3 +62,20 @@ TEST(BFS, FindsShortestPathRatherThanFirstFoundPath)
 
   EXPECT_EQ(path, expected);
 }
+
+TEST(Graph, FindsReverseNeighbours)
+{
+  wiki::Graph graph;
+
+  graph.addEdge("A", "B");
+  graph.addEdge("C", "B");
+  graph.addEdge("B", "D");
+
+  auto neighbours = graph.reverseNeighbours("B");
+
+  std::sort(neighbours.begin(), neighbours.end());
+
+  std::vector<std::string> expected = {"A", "C"};
+  EXPECT_EQ(
+      neighbours, expected);
+}

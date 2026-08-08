@@ -7,7 +7,7 @@ int main()
 {
   wiki::WikiClient wiki;
 
-  auto path = wiki::bfs("Cat", "Dog", [&](const std::string &node)
+  auto path = wiki::bfs("Lebron James", "Spider-man", [&](const std::string &node)
                         { return wiki.getLinks(node); });
 
   for (const auto &page : path)
