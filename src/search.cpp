@@ -9,6 +9,9 @@ namespace wiki {
 
 std::vector<std::string> bfs(const Graph &graph, const std::string &start,
                              const std::string &target) {
+
+  if (start == target)
+    return {};
   std::queue<std::string> queue;
   std::unordered_set<std::string> visited;
   std::unordered_map<std::string, std::string> parent;
