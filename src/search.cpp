@@ -31,7 +31,6 @@ namespace wiki
       std::string current = queue.front();
       queue.pop();
 
-      std::cout << "Visiting: " << current << "\n";
       if (current == target)
       {
         break;

@@ -69,6 +69,8 @@ namespace wiki
         {
             throttle();
 
+            ++httpRequests;
+
             CURL *curl = curl_easy_init();
             if (!curl)
                 throw std::runtime_error("curl init failed");

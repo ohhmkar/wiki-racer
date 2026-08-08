@@ -41,6 +41,17 @@ target_link_libraries(wiki-racer
         wiki-core
 )
 
+# Benchmarks
+
+add_executable(wiki-racer-bench
+    bench/bench.cpp
+)
+
+target_link_libraries(wiki-racer-bench
+    PRIVATE
+        wiki-core
+)
+
 # Tests
 
 enable_testing()

@@ -52,14 +52,17 @@ namespace
   }
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+  const std::string start = argc > 1 ? argv[1] : "PhonePe";
+  const std::string target = argc > 2 ? argv[2] : "Sardar Patel Institute of Technology";
+
   wiki::WikiClient wiki;
 
   try
   {
     auto path = wiki::bidirectionalBfs(
-        "Andrew Garfield", "LeBron James",
+        start, target,
         [&](const std::string &node)
         { return wiki.getLinks(node); },
         [&](const std::string &node)
@@ -67,7 +70,9 @@ int main()
         titleSimilarity);
 
     for (const auto &page : path)
-      std::cout << page << "\n";
+      std::cout << page << " -> ";
+
+    std::cerr << "requests made: " << wiki.requestsMade() << "\n";
   }
   catch (const std::exception &e)
   {
