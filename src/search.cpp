@@ -1,6 +1,7 @@
 #include "wiki/search.hpp"
 
 #include <algorithm>
+#include <iostream>
 #include <queue>
 #include <unordered_map>
 #include <unordered_set>
@@ -25,6 +26,7 @@ namespace wiki
       std::string current = queue.front();
       queue.pop();
 
+      std::cout << "Visiting: " << current << "\n";
       if (current == target)
       {
         break;

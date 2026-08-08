@@ -26,6 +26,12 @@ namespace wiki
 
     std::vector<std::string> WikiClient::getLinks(const std::string &title) const
     {
+
+        auto cached = cache.find(title);
+        if (cached != cache.end())
+        {
+            reutn cached->second;
+        }
         CURL *curl = curl_easy_init();
 
         if (!curl)
@@ -97,6 +103,7 @@ namespace wiki
             }
         }
 
+        cache[title] = links;
         return links;
     }
 
