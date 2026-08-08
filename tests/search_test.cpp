@@ -168,3 +168,57 @@ TEST(BidirectionalBFS, MeetingDetectedDuringBackwardExpansion)
   std::vector<std::string> expected = {"S", "A", "B", "C", "T"};
   EXPECT_EQ(path, expected);
 }
+
+TEST(BidirectionalBFS, InvokesFrontierScorer)
+{
+  wiki::Graph graph;
+
+  graph.addEdge("S", "A");
+  graph.addEdge("A", "T");
+  graph.addEdge("S", "B");
+  graph.addEdge("B", "T");
+
+  int calls = 0;
+  auto path = wiki::bidirectionalBfs(
+      "S", "T",
+      [&](const std::string &node)
+      { return graph.neighbours(node); },
+      [&](const std::string &node)
+      { return graph.reverseNeighbours(node); },
+      [&](const std::string &node, const std::string &goal)
+      {
+        ++calls;
+        (void)node;
+        return goal == "T" ? 1.0 : 0.0;
+      });
+
+  EXPECT_EQ(path.size(), 3);
+  EXPECT_EQ(path.front(), "S");
+  EXPECT_EQ(path.back(), "T");
+  EXPECT_GT(calls, 0);
+}
+
+TEST(BidirectionalBFS, ScoringDoesNotBreakShortestPathGuarantee)
+{
+  wiki::Graph graph;
+
+  graph.addEdge("S", "Distractor");
+  graph.addEdge("Distractor", "Mid");
+  graph.addEdge("Mid", "T");
+  graph.addEdge("S", "Good");
+  graph.addEdge("Good", "T");
+
+  auto path = wiki::bidirectionalBfs(
+      "S", "T",
+      [&](const std::string &node)
+      { return graph.neighbours(node); },
+      [&](const std::string &node)
+      { return graph.reverseNeighbours(node); },
+      [](const std::string &node, const std::string &)
+      {
+        return node == "Distractor" ? 100.0 : 0.0;
+      });
+
+  std::vector<std::string> expected = {"S", "Good", "T"};
+  EXPECT_EQ(path, expected);
+}

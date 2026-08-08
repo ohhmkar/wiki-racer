@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 
 #include <chrono>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -45,12 +46,29 @@ namespace wiki
         }
     }
 
+    void WikiClient::throttle() const
+    {
+        constexpr auto requestInterval = std::chrono::milliseconds(3000);
+
+        std::lock_guard<std::mutex> lock(throttleMutex);
+
+        auto now = std::chrono::steady_clock::now();
+        auto scheduled = std::max(now, nextAllowedRequest);
+
+        if (scheduled > now)
+            std::this_thread::sleep_for(scheduled - now);
+
+        nextAllowedRequest = scheduled + requestInterval;
+    }
+
     std::string WikiClient::fetchJson(const std::string &url) const
     {
         constexpr int maxAttempts = 10;
 
         for (int attempt = 1; attempt <= maxAttempts; ++attempt)
         {
+            throttle();
+
             CURL *curl = curl_easy_init();
             if (!curl)
                 throw std::runtime_error("curl init failed");
@@ -114,23 +132,41 @@ namespace wiki
             "&redirects=1"
             "&format=json";
 
-        nlohmann::json data = nlohmann::json::parse(fetchJson(url));
-
         std::vector<std::string> links;
+        std::string continueToken;
+        int pageNumber = 0;
 
-        for (auto it = data["query"]["pages"].begin(); it != data["query"]["pages"].end(); ++it)
+        while (true)
         {
-            const auto &page = it.value();
-            if (!page.contains("links"))
-                continue;
+            std::string requestUrl = url;
+            if (!continueToken.empty())
+                requestUrl += "&plcontinue=" + urlEncode(continueToken);
 
-            for (const auto &link : page["links"])
+            ++pageNumber;
+            if (pageNumber > 1)
+                std::cout << "  " << title << ": fetching links page " << pageNumber << std::endl;
+
+            nlohmann::json data = nlohmann::json::parse(fetchJson(requestUrl));
+
+            for (auto it = data["query"]["pages"].begin(); it != data["query"]["pages"].end(); ++it)
             {
-                if (link["ns"] != 0)
+                const auto &page = it.value();
+                if (!page.contains("links"))
                     continue;
 
-                links.push_back(link["title"]);
+                for (const auto &link : page["links"])
+                {
+                    if (link["ns"] != 0)
+                        continue;
+
+                    links.push_back(link["title"]);
+                }
             }
+
+            if (!data.contains("continue") || !data["continue"].contains("plcontinue") || !data["continue"]["plcontinue"].is_string())
+                break;
+
+            continueToken = data["continue"]["plcontinue"].get<std::string>();
         }
 
         std::lock_guard<std::mutex> lock(cacheMutex);
@@ -159,16 +195,34 @@ namespace wiki
             "&bllimit=max"
             "&format=json";
 
-        nlohmann::json data = nlohmann::json::parse(fetchJson(url));
-
         std::vector<std::string> backlinks;
+        std::string continueToken;
+        int pageNumber = 0;
 
-        for (const auto &link : data["query"]["backlinks"])
+        while (true)
         {
-            if (link["ns"] != 0)
-                continue;
+            std::string requestUrl = url;
+            if (!continueToken.empty())
+                requestUrl += "&blcontinue=" + urlEncode(continueToken);
 
-            backlinks.push_back(link["title"]);
+            ++pageNumber;
+            if (pageNumber > 1)
+                std::cout << "  " << resolved << ": fetching backlinks page " << pageNumber << std::endl;
+
+            nlohmann::json data = nlohmann::json::parse(fetchJson(requestUrl));
+
+            for (const auto &link : data["query"]["backlinks"])
+            {
+                if (link["ns"] != 0)
+                    continue;
+
+                backlinks.push_back(link["title"]);
+            }
+
+            if (!data.contains("continue") || !data["continue"].contains("blcontinue") || !data["continue"]["blcontinue"].is_string())
+                break;
+
+            continueToken = data["continue"]["blcontinue"].get<std::string>();
         }
 
         std::lock_guard<std::mutex> lock(cacheMutex);

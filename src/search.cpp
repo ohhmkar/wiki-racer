@@ -72,6 +72,27 @@ namespace wiki
 
   namespace
   {
+    void orderByScore(std::vector<std::string> &level, const FrontierScorer &scoreFrontier, const std::string &goal)
+    {
+      if (!scoreFrontier)
+        return;
+
+      std::vector<std::pair<double, std::string>> scored;
+      scored.reserve(level.size());
+
+      for (const auto &node : level)
+        scored.emplace_back(scoreFrontier(node, goal), node);
+
+      std::sort(scored.begin(), scored.end(), [](const auto &a, const auto &b)
+                { return a.first > b.first; });
+
+      level.clear();
+      level.reserve(scored.size());
+
+      for (auto &entry : scored)
+        level.push_back(std::move(entry.second));
+    }
+
     std::vector<std::pair<std::string, std::vector<std::string>>> fetchNeighboursConcurrently(
         const std::vector<std::string> &nodes,
         const NeighbourProvider &getNeighbours)
@@ -149,7 +170,7 @@ namespace wiki
     }
   } // namespace
 
-  std::vector<std::string> bidirectionalBfs(const std::string &start, const std::string &target, const NeighbourProvider &getNeighbours, const NeighbourProvider &getReverseNeighbours)
+  std::vector<std::string> bidirectionalBfs(const std::string &start, const std::string &target, const NeighbourProvider &getNeighbours, const NeighbourProvider &getReverseNeighbours, const FrontierScorer &scoreFrontier)
   {
 
     if (start == target)
@@ -167,9 +188,11 @@ namespace wiki
     forwardParent[start] = "";
     backwardParent[target] = "";
 
+    std::size_t depth = 0;
+
     while (!forwardQueue.empty() && !backwardQueue.empty())
     {
-      constexpr std::size_t batchSize = 4;
+      constexpr std::size_t batchSize = 2;
 
       std::vector<std::string> forwardLevel;
       std::size_t forwardSize = forwardQueue.size();
@@ -180,11 +203,17 @@ namespace wiki
         forwardQueue.pop();
       }
 
+      std::cout << "forward depth " << depth << ": " << forwardLevel.size() << " node(s) to expand\n";
+      orderByScore(forwardLevel, scoreFrontier, target);
+
       while (!forwardLevel.empty())
       {
         std::size_t batch = std::min(batchSize, forwardLevel.size());
         std::vector<std::string> batchNodes(forwardLevel.begin(), forwardLevel.begin() + batch);
         forwardLevel.erase(forwardLevel.begin(), forwardLevel.begin() + batch);
+
+        for (const auto &node : batchNodes)
+          std::cout << "  fetching links for " << node << std::endl;
 
         auto results = fetchNeighboursConcurrently(batchNodes, getNeighbours);
 
@@ -202,6 +231,7 @@ namespace wiki
 
             if (backwardParent.contains(neighbour))
             {
+              std::cout << "meeting at " << neighbour << std::endl;
               return reconstructPath(neighbour, forwardParent, backwardParent);
             }
           }
@@ -217,11 +247,17 @@ namespace wiki
         backwardQueue.pop();
       }
 
+      std::cout << "backward depth " << depth << ": " << backwardLevel.size() << " node(s) to expand\n";
+      orderByScore(backwardLevel, scoreFrontier, start);
+
       while (!backwardLevel.empty())
       {
         std::size_t batch = std::min(batchSize, backwardLevel.size());
         std::vector<std::string> batchNodes(backwardLevel.begin(), backwardLevel.begin() + batch);
         backwardLevel.erase(backwardLevel.begin(), backwardLevel.begin() + batch);
+
+        for (const auto &node : batchNodes)
+          std::cout << "  fetching backlinks for " << node << std::endl;
 
         auto results = fetchNeighboursConcurrently(batchNodes, getReverseNeighbours);
 
@@ -239,11 +275,14 @@ namespace wiki
 
             if (forwardParent.contains(neighbour))
             {
+              std::cout << "meeting at " << neighbour << std::endl;
               return reconstructPath(neighbour, forwardParent, backwardParent);
             }
           }
         }
       }
+
+      ++depth;
     }
 
     return {};
