@@ -5,6 +5,7 @@
 
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace wiki
 {
@@ -23,7 +24,7 @@ namespace wiki
         }
     }
 
-    std::vector<std::stirng> WikiClient::getLinks(const std::string &title) const
+    std::vector<std::string> WikiClient::getLinks(const std::string &title) const
     {
         CURL *curl = curl_easy_init();
 
@@ -51,9 +52,52 @@ namespace wiki
 
         curl_free(encodedTitle);
 
+        std::string response;
+
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, "wiki-racer/0.1 (https://github.com/ohhmkar/wiki-racer)");
+
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
+
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+
+        CURLcode result = curl_easy_perform(curl);
+
+        if (result != CURLE_OK)
+        {
+            curl_easy_cleanup(curl);
+
+            throw std::runtime_error(
+                curl_easy_strerror(result));
+        }
+
         curl_easy_cleanup(curl);
 
-        return {};
+        nlohmann::json data = nlohmann::json::parse(response);
+
+        std::vector<std::string> links;
+
+        for (auto it = data["query"]["pages"].begin(); it != data["query"]["pages"].end(); ++it)
+        {
+            const auto &page = it.value();
+            if (!page.contains("links"))
+            {
+                continue;
+            }
+
+            for (const auto &link : page["links"])
+            {
+                if (link["ns"] != 0)
+                {
+                    continue;
+                }
+
+                links.push_back(link["title"]);
+            }
+        }
+
+        return links;
     }
 
 }

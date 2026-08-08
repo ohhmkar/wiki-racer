@@ -1,26 +1,17 @@
 #include <iostream>
 
-#include "wiki/graph.hpp"
-#include "wiki/search.hpp"
+#include "wiki/wiki_client.hpp"
 
-int main() {
-  wiki::Graph graph;
+int main()
+{
+  wiki::WikiClient wiki;
 
-  graph.addEdge("A", "B");
-  graph.addEdge("B", "C");
-  graph.addEdge("B", "D");
-  graph.addEdge("A", "C");
+  auto links = wiki.getLinks("Cat");
 
-  auto path = wiki::bfs(graph, "A", "D");
-
-  for (const auto &node : path) {
-    std::cout << node;
-
-    if (node != path.back()) {
-      std::cout << " -> ";
-    }
+  for (const auto &link : links)
+  {
+    std::cout << link << '\n';
   }
 
-  std::cout << "\n";
   return 0;
 }

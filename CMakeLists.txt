@@ -8,10 +8,15 @@ project(wiki-racer
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+find_package(CURL REQUIRED)
+find_package(nlohmann_json REQUIRED)
+
 # Core library
+
 add_library(wiki-core
     src/graph.cpp
     src/search.cpp
+    src/wiki_client.cpp
 )
 
 target_include_directories(wiki-core
@@ -19,7 +24,14 @@ target_include_directories(wiki-core
         ${PROJECT_SOURCE_DIR}/include
 )
 
+target_link_libraries(wiki-core
+    PUBLIC
+        CURL::libcurl
+        nlohmann_json::nlohmann_json
+)
+
 # Main executable
+
 add_executable(wiki-racer
     src/main.cpp
 )
@@ -30,6 +42,7 @@ target_link_libraries(wiki-racer
 )
 
 # Tests
+
 enable_testing()
 
 find_package(GTest REQUIRED)
