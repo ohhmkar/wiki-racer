@@ -33,7 +33,7 @@ Hong Kong Disneyland
 Spider-man
 ```
 
-four hops. its interesting that `Lebron James` is a redirect and `Spider-man` is too, so the redirect resolution is doing real work here to get from the title you typed to the actual articles. also took about 36 seconds because wikipedia kept telling us to slow down, but it got there.
+four hops. its interesting that `Lebron James` is a redirect to `LeBron James` and `Spider-man` is to `Spider-Man`, so the redirect resolution is doing real work here to get from the title you typed to the actual articles. also took about 36 seconds because wikipedia API limits.
 
 ## building
 
