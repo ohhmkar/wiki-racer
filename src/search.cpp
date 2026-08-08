@@ -8,7 +8,7 @@
 namespace wiki
 {
 
-  std::vector<std::string> bfs(const Graph &graph, const std::string &start, const std::string &target)
+  std::vector<std::string> bfs(const std::string &start, const std::string &target, const NeighbourProvider &getNeighbours)
   {
 
     if (start == target)
@@ -30,7 +30,7 @@ namespace wiki
         break;
       }
 
-      for (const auto &neighbour : graph.neighbours(current))
+      for (const auto &neighbour : getNeighbours(current))
       {
         if (visited.contains(neighbour))
         {

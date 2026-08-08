@@ -12,7 +12,8 @@ TEST(BFS, FindsShortestPath)
   graph.addEdge("B", "D");
   graph.addEdge("C", "D");
 
-  auto path = wiki::bfs(graph, "A", "D");
+  auto path = wiki::bfs("A", "D", [&](const std::string &node)
+                        { return graph.neighbours(node); });
 
   EXPECT_EQ(path.size(), 3);
   EXPECT_EQ(path.front(), "A");
@@ -26,7 +27,8 @@ TEST(BFS, ReturnsEmptyWhenNoPathExists)
   graph.addEdge("A", "B");
   graph.addEdge("C", "D");
 
-  auto path = wiki::bfs(graph, "A", "D");
+  auto path = wiki::bfs("A", "D", [&](const std::string &node)
+                        { return graph.neighbours(node); });
 
   EXPECT_TRUE(path.empty());
 }
@@ -35,7 +37,8 @@ TEST(BFS, StartEqualsTarget)
 {
   wiki::Graph graph;
 
-  auto path = wiki::bfs(graph, "A", "A");
+  auto path = wiki::bfs("A", "A", [&](const std::string &node)
+                        { return graph.neighbours(node); });
 
   std::vector<std::string> expected = {"A"};
 
@@ -44,7 +47,6 @@ TEST(BFS, StartEqualsTarget)
 
 TEST(BFS, FindsShortestPathRatherThanFirstFoundPath)
 {
-
   wiki::Graph graph;
 
   graph.addEdge("A", "B");
@@ -53,7 +55,8 @@ TEST(BFS, FindsShortestPathRatherThanFirstFoundPath)
   graph.addEdge("D", "E");
   graph.addEdge("A", "E");
 
-  auto path = wiki::bfs(graph, "A", "E");
+  auto path = wiki::bfs("A", "E", [&](const std::string &node)
+                        { return graph.neighbours(node); });
 
   std::vector<std::string> expected = {"A", "E"};
 

@@ -1,11 +1,14 @@
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 
 #include "wiki/graph.hpp"
 
-namespace wiki {
-std::vector<std::string> bfs(const Graph &graph, const std::string &start,
-                             const std::string &target);
+namespace wiki
+{
+    using NeighbourProvider = std::function<std::vector<std::string>(const std::string &)>;
+
+    std::vector<std::string> bfs(const std::string &start, const std::string &target, const NeighbourProvider &getNeighbours);
 }
