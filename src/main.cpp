@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "wiki/graph.hpp"
+#include "wiki/search.hpp"
 
 int main() {
   wiki::Graph graph;
@@ -10,7 +11,16 @@ int main() {
   graph.addEdge("B", "D");
   graph.addEdge("A", "C");
 
-  for (const auto &node : graph.neighbours("A")) {
-    std::cout << node << "\n";
+  auto path = wiki::bfs(graph, "A", "D");
+
+  for (const auto &node : path) {
+    std::cout << node;
+
+    if (node != path.back()) {
+      std::cout << " -> ";
+    }
   }
+
+  std::cout << "\n";
+  return 0;
 }
