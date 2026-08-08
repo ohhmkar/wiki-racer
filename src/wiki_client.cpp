@@ -107,4 +107,69 @@ namespace wiki
         return links;
     }
 
+    std::vector<std::string> WikiClient::getBacklinks(const std::string &title) const
+    {
+        auto cached = backlinkCache.find(title);
+        if (cached != backlinkCache.end())
+        {
+            return cached->second;
+        }
+
+        CURL *curl = curl_easy_init();
+        if (!curl)
+        {
+            throw std::runtime_error("curl init failed!\n");
+        }
+
+        char *encodedTitle = curl_easy_escape(curl, title.c_str(), title.size());
+
+        if (!encodedTitle)
+        {
+            curl_easy_cleanup(curl);
+            throw std::runtime_error("failed to encode title\n");
+        }
+
+        std::string url =
+            "https://en.wikipedia.org/w/api.php"
+            "?action=query"
+            "&list=backlinks"
+            "&bltitle=" +
+            std::string(encodedTitle) +
+            "&blnamespace=0"
+            "&bllimit=max"
+            "&format=json";
+
+        curl_free(encodedTitle);
+
+        std::string response;
+
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, "wiki-racer/0.1 (https://github.com/ohhmkar/wiki-racer)");
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+
+        CURLcode result = curl_easy_perform(curl);
+        if (result != CURLE_OK)
+        {
+            curl_easy_cleanup(curl);
+            throw std::runtime_error(curl_easy_strerror(result));
+        }
+
+        curl_easy_cleanup(curl);
+
+        nlohmann::json data = nlohmann::json::parse(response);
+
+        std::vector<std::string> backlinks;
+
+        for (const auto &link : data["query"]["backlinks"])
+        {
+            if (link["ns"] != 0)
+                continue;
+
+            backlinks.push_back(link["title"]);
+        }
+        backlinkCache[title] = backlinks;
+        return backlinks;
+    }
+
 }
