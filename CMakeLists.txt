@@ -56,7 +56,12 @@ target_link_libraries(wiki-racer-bench
 
 enable_testing()
 
-find_package(GTest REQUIRED)
+include(FetchContent)
+FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.tar.gz
+)
+FetchContent_MakeAvailable(googletest)
 
 add_executable(wiki-racer-tests
     tests/search_test.cpp
